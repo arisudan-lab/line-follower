@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ESP32 RC Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #222;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            /* Prevent text selection on mobile while tapping buttons */
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+        .settings-card {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: inline-block;
+        }
+        input[type="text"] {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 150px;
+            font-size: 16px;
+            text-align: center;
+        }
+        button.save-btn {
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            grid-gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background-color: #555;
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px #111;
+        }
+        .control-btn:active {
+            background-color: #777;
+            box-shadow: 0 0 #111;
+            transform: translateY(4px);
+        }
+        .empty { visibility: hidden; }
+        #status {
+            margin-top: 20px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>RC Car Web Control</h2>
+
+    <div class="settings-card">
+        <label for="ipInput">ESP32 IP: </label>
+        <input type="text" id="ipInput" placeholder="192.168.x.x">
+        <button class="save-btn" onclick="saveIP()">Save</button>
+    </div>
+
+    <div class="d-pad">
+        <div class="empty"></div>
+        <button class="control-btn" id="btn-F">W</button>
+        <div class="empty"></div>
+        
+        <button class="control-btn" id="btn-L">A</button>
+        <button class="control-btn" id="btn-S" style="background-color: #d32f2f;">Stop</button>
+        <button class="control-btn" id="btn-R">D</button>
+        
+        <div class="empty"></div>
+        <button class="control-btn" id="btn-B">S</button>
+        <div class="empty"></div>
+    </div>
+
+    <div id="status">Waiting for command...</div>
+
+    <script>
+        // 1. Load IP from Local Storage when page opens
+        window.onload = function() {
+            const savedIP = localStorage.getItem("esp32_ip");
+            if (savedIP) {
+                document.getElementById("ipInput").value = savedIP;
+            }
+        };
+
+        // 2. Save IP to Local Storage
+        function saveIP() {
+            const ip = document.getElementById("ipInput").value.trim();
+            if (ip) {
+                localStorage.setItem("esp32_ip", ip);
+                document.getElementById("status").innerText = "IP Saved!";
+                document.getElementById("status").style.color = "#4CAF50";
+            }
+        }
+
+        // 3. Function to send HTTP GET commands to the ESP32
+        function sendCommand(cmd) {
+            const ip = document.getElementById("ipInput").value.trim();
+            if (!ip) {
+                document.getElementById("status").innerText = "Please enter and save IP first!";
+                document.getElementById("status").style.color = "#ff5252";
+                return;
+            }
+
+            const url = `http://${ip}/${cmd}`;
+            document.getElementById("status").innerText = `Sending: ${cmd}`;
+            document.getElementById("status").style.color = "#aaa";
+
+            // Use fetch with no-cors to prevent browser errors if the ESP takes a moment to reply
+            fetch(url, { method: 'GET', mode: 'no-cors' })
+                .catch(err => console.log("Fetch error (expected with no-cors):", err));
+        }
+
+        // 4. Attach Event Listeners for Press and Release
+        // We use both mouse and touch events so it works on PC and Mobile
+        function setupButton(btnId, cmdPress) {
+            const btn = document.getElementById(btnId);
+            
+            // When pressed down -> Send movement command
+            btn.addEventListener('mousedown', () => sendCommand(cmdPress));
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); sendCommand(cmdPress); });
+
+            // When released -> Send Stop command ('S')
+            btn.addEventListener('mouseup', () => sendCommand('S'));
+            btn.addEventListener('mouseleave', () => sendCommand('S')); // Stop if mouse drags off button
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); sendCommand('S'); });
+        }
+
+        // Setup the buttons
+        setupButton('btn-F', 'F'); // Forward
+        setupButton('btn-B', 'B'); // Backward
+        setupButton('btn-L', 'L'); // Left
+        setupButton('btn-R', 'R'); // Right
+        
+        // The Stop button just stops when pressed
+        document.getElementById('btn-S').addEventListener('mousedown', () => sendCommand('S'));
+        document.getElementById('btn-S').addEventListener('touchstart', (e) => { e.preventDefault(); sendCommand('S'); });
+
+    </script>
+</body>
+</html>
